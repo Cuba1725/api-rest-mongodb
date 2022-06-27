@@ -1,5 +1,6 @@
 import { User } from "../models/User.js";
-import { /* generateRefreshToken, */ generateToken } from "../utils/generateToken.js";
+import { generateRefreshToken, generateToken } from "../utils/generateToken.js";
+import { errorsTokens } from "../helpers/errorsToken.js";
 
 export const register = async(req, res) => {    
     try {
@@ -12,7 +13,7 @@ export const register = async(req, res) => {
         await user.save();
         console.log(user);
         const { token, expiresIn } = generateToken(user.id);
-        /* generateRefreshToken(user.id, res); */
+        generateRefreshToken(user.id, res);
         
         return res.json({ token, expiresIn });
     } catch (error) {
@@ -31,7 +32,7 @@ export const login = async(req, res) => {
             throw new Error("Usuario o contraseña incorrectos");
 
         const { token, expiresIn } = generateToken(user.id);
-        /* generateRefreshToken(user.id, res); */
+        generateRefreshToken(user.id, res);
 
         
         return res.json({ token, expiresIn });
@@ -39,5 +40,33 @@ export const login = async(req, res) => {
         console.log(error);
         return res.status(403).json({ error: error.message });
     }
+}
 
+export const infoUser = async(req, res) => {
+    try {
+        const user = await User.findById(req.uid).lean();
+        delete user.password;
+        return res.json({user});
+    } catch (error) {
+        return res.status(403).json({ error: error.message });
+    }
+}
+
+export const refreshToken = (req, res) => {
+    try {
+        let refreshTokenCookie = req.cookie?.refreshToken;
+        if (!refreshTokenCookie) throw new Error("No existe el refreshToken");
+
+        const { id } = jwt.verify(refreshTokenCookie, process.env.JWT_REFRESH);
+        const { token, expiresIn } = generateToken(id);
+        return res.json({ token, expiresIn });
+    } catch (error) {
+        const data = errorsTokens(error);
+        return res.status(401).json({ error: data });
+    }
+}
+
+export const logout = (req, res) => {
+    res.clearCookie("refreshToken");
+    return res.json({ message: "Logout correcto" });
 }
